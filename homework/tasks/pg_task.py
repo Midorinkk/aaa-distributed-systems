@@ -39,6 +39,18 @@ class ItemStorage:
         # like https://github.com/pressly/goose
         # YOUR CODE GOES HERE
 
+        # в тестах длина текстовых полей = 5 -> CHARACTER(5)
+        await self._pool.execute(
+            """
+            CREATE TABLE items (
+                item_id INTEGER UNIQUE NOT NULL,
+                user_id INTEGER NOT NULL,
+                title CHARACTER (5) NOT NULL,
+                description CHARACTER (5) NOT NULL
+            )
+            """
+        )
+
     async def save_items(self, items: list[ItemEntry]) -> None:
         """
         Напишите код для вставки записей в таблицу items одним запросом, цикл
@@ -48,6 +60,19 @@ class ItemStorage:
         # sql injections https://habr.com/ru/articles/148151/.
         # YOUR CODE GOES HERE
 
+        # если пустой список, ничего не делаем
+        if len(items) == 0:
+            return
+
+        await self._pool.executemany(
+            """
+            INSERT INTO items (item_id, user_id, title, description)
+            VALUES ($1, $2, $3, $4);
+            """,
+            [(item.item_id, item.user_id, item.title, item.description)
+             for item in items]
+        )
+
     async def find_similar_items(
         self, user_id: int, title: str, description: str
     ) -> list[ItemEntry]:
@@ -55,3 +80,18 @@ class ItemStorage:
         Напишите код для поиска записей, имеющих указанные user_id, title и description.
         """
         # YOUR CODE GOES HERE
+        rows = await self._pool.fetch(
+            """
+            SELECT item_id,
+                   user_id,
+                   title,
+                   description
+            FROM items
+            WHERE user_id = $1
+                  and title = $2
+                  and description = $3
+            """,
+            user_id, title, description
+        )
+
+        return [ItemEntry(**row) for row in rows]
